@@ -35,12 +35,21 @@ type LogsStatsItem struct {
 }
 
 // LogsStats returns hourly grouped logs statistics.
+//
+// Performance note: we GROUP BY the strftime expression *verbatim* (not by the
+// `date` alias) so SQLite can match it against the precomputed
+// idx_logs_created_hour expression index. Aliased GROUP BY is sometimes
+// resolved post-aggregation by the planner and skips the index, which on
+// tens-of-millions-of-rows tables means a full table scan instead of an
+// index-only count.
 func (app *BaseApp) LogsStats(expr dbx.Expression) ([]*LogsStatsItem, error) {
 	result := []*LogsStatsItem{}
 
+	const bucketExpr = "strftime('%Y-%m-%d %H:00:00', created)"
+
 	query := app.LogQuery().
-		Select("count(id) as total", "strftime('%Y-%m-%d %H:00:00', created) as date").
-		GroupBy("date")
+		Select("count(id) as total", bucketExpr+" as date").
+		GroupBy(bucketExpr)
 
 	if expr != nil {
 		query.AndWhere(expr)
