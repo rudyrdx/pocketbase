@@ -1,3 +1,27 @@
+## v0.39.2
+
+- Fixed records list UI sorting ([#7724](https://github.com/pocketbase/pocketbase/issues/7724)).
+
+- Don't clear the date input on invalid value while still typing ([#7726](https://github.com/pocketbase/pocketbase/issues/7726)).
+
+- Return `filepath.SkipDir` in the `pb_hooks` dirs watcher to avoid unnecessary iterating over `node_modules` and `.*` prefixed hidden dirs (`.DS_Store`, `.git`, etc.).
+
+- Show the "Affected rows" SQL console message only if non-empty to avoid ambiguity with drivers that don't support returning the affected rows count.
+
+- Updated `modernc.org/sqlite` to v1.52.0 ([SQLite 3.53.2](https://sqlite.org/src/timeline?from=version-3.53.0&to=version-3.53.2&to2=branch-3.53&y=ci)).
+
+
+## v0.39.1
+
+- Fixed multiple select options wrapping ([#7720](https://github.com/pocketbase/pocketbase/issues/7720)).
+
+- Return the hidden record data fields for superusers realtime subscribers ([#7721](https://github.com/pocketbase/pocketbase/issues/7721)).
+
+- Added default panic-recover handling for the cron jobs to avoid terminating the server on panic.
+
+- Bumped the min Go GitHub action version to 1.26.4 as it includes some [minor security fixes](https://github.com/golang/go/issues?q=milestone%3AGo1.26.4).
+
+
 ## v0.39.0
 
 - Added new "SQL console" section under _Settings > Debug_ allowing executing any raw SQL query from the UI ([#2236](https://github.com/pocketbase/pocketbase/issues/2236); [#7638](https://github.com/pocketbase/pocketbase/discussions/7638)).
