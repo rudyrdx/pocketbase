@@ -3,7 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"log"
@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
+	validation "github.com/pocketbase/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core/validators"
 	"github.com/pocketbase/pocketbase/tools/dbutils"
 	"github.com/pocketbase/pocketbase/tools/filesystem"
@@ -959,6 +959,11 @@ func (m *Record) GetInt(key string) int {
 	return cast.ToInt(m.Get(key))
 }
 
+// GetInt64 returns the data value for "key" as an int64.
+func (m *Record) GetInt64(key string) int64 {
+	return cast.ToInt64(m.Get(key))
+}
+
 // GetFloat returns the data value for "key" as a float64.
 func (m *Record) GetFloat(key string) float64 {
 	return cast.ToFloat64(m.Get(key))
@@ -1218,12 +1223,12 @@ func areValuesEqual(a any, b any) bool {
 		bv, ok := b.(types.JSONRaw)
 		return ok && bytes.Equal(av, bv)
 	default:
-		aRaw, err := json.Marshal(a)
+		aRaw, err := json.Marshal(a, json.Deterministic(true))
 		if err != nil {
 			return false
 		}
 
-		bRaw, err := json.Marshal(b)
+		bRaw, err := json.Marshal(b, json.Deterministic(true))
 		if err != nil {
 			return false
 		}
@@ -1324,7 +1329,7 @@ func (record *Record) PublicExport() map[string]any {
 //
 // Only the data exported by `PublicExport()` will be serialized.
 func (m Record) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.PublicExport())
+	return json.Marshal(m.PublicExport(), json.Deterministic(true))
 }
 
 // UnmarshalJSON implements the [json.Unmarshaler] interface.

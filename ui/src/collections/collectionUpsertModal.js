@@ -7,6 +7,7 @@ import { collectionViewQueryTab } from "./collectionViewQueryTab";
 window.app = window.app || {};
 window.app.modals = window.app.modals || {};
 
+// @todo consider adding an option for setting the initial open tab
 window.app.modals.openCollectionUpsert = function(collection = {}, modalSettings = {
     // base modal events
     onbeforeopen: null, // function(el) {},
@@ -230,6 +231,12 @@ function collectionUpsertModal(rawCollection, modalSettings) {
         clone.created = "";
         clone.updated = "";
 
+        // reset field ids
+        // (in case the field relies on the id to dinstinguish new vs old)
+        clone.fields?.forEach((field) => {
+            delete field.id;
+        });
+
         // updated indexes ids
         clone.indexes = clone.indexes?.map((idx) => {
             return app.utils.replaceIndexFields(idx, (parsed) => {
@@ -265,8 +272,13 @@ function collectionUpsertModal(rawCollection, modalSettings) {
             className: "modal collection-upsert-modal",
             inert: () => data.isSaving,
             onkeydown: (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.code == "KeyS") {
+                if (
+                    (e.ctrlKey || e.metaKey)
+                    && e.code == "KeyS"
+                    && app.modals.getTop() === modal
+                ) {
                     e.preventDefault();
+
                     // temp blur any active input to make sure that onchange/blur events are fired
                     const input = document.activeElement;
                     input?.blur();
@@ -970,7 +982,7 @@ function deleteDropdownItem(data, modalSettings) {
                             return false;
                         }
 
-                        app.modals.close(collectionModal);
+                        app.modals.close(collectionModal, true);
                     },
                     () => {
                         local.nameConfirm = "";

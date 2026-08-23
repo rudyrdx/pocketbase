@@ -1,7 +1,7 @@
 package core_test
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"slices"
 	"testing"
@@ -232,6 +232,12 @@ func TestCreateViewFields(t *testing.T) {
 		{
 			"query with wildcard column",
 			"select a.id, a.* from demo1 a",
+			true,
+			nil,
+		},
+		{
+			"wrapped query with wildcard column",
+			"select * from (select 1 as id)",
 			true,
 			nil,
 		},
@@ -524,7 +530,7 @@ func TestCreateViewFields(t *testing.T) {
 			}
 
 			if len(s.expectFields) != len(result) {
-				serialized, _ := json.Marshal(result)
+				serialized, _ := json.Marshal(result, json.Deterministic(true))
 				t.Fatalf("Expected %d fields, got %d: \n%s", len(s.expectFields), len(result), serialized)
 			}
 
@@ -781,7 +787,7 @@ func TestDryRunView(t *testing.T) {
 		},
 		{
 			"select resolving to records with missing id",
-			"(select 'a' as id UNION ALL select null as id UNION ALL select 'c' as id)",
+			"select id from (select 'a' as id UNION ALL select null as id UNION ALL select 'c' as id)",
 			10,
 			true,
 			nil,
@@ -789,7 +795,7 @@ func TestDryRunView(t *testing.T) {
 		},
 		{
 			"select resolving to records with duplicated ids",
-			"(select 'a' as id UNION ALL select 'a' as id UNION ALL select 'c' as id)",
+			"select id from (select 'a' as id UNION ALL select 'a' as id UNION ALL select 'c' as id)",
 			10,
 			true,
 			nil,
@@ -797,7 +803,7 @@ func TestDryRunView(t *testing.T) {
 		},
 		{
 			"no sample size and valid select query but with invalid records result",
-			"(select 'a' as id UNION ALL select 'a' as id UNION ALL select 'c' as id)",
+			"select id from (select 'a' as id UNION ALL select 'a' as id UNION ALL select 'c' as id)",
 			0,
 			false, // still "valid" because there is no sample to check
 			map[string]string{"id": "text"},
@@ -805,7 +811,7 @@ func TestDryRunView(t *testing.T) {
 		},
 		{
 			"sample size < total select records",
-			"(select 'a' as id UNION ALL select 'b' as id UNION ALL select 'c' as id UNION ALL select 'd' as id)",
+			"select id from (select 'a' as id UNION ALL select 'b' as id UNION ALL select 'c' as id UNION ALL select 'd' as id)",
 			3,
 			false,
 			map[string]string{"id": "text"},
@@ -829,7 +835,7 @@ func TestDryRunView(t *testing.T) {
 			// check fields
 			// ---
 			if len(s.expectFields) != len(result.Fields) {
-				serialized, _ := json.Marshal(result.Fields)
+				serialized, _ := json.Marshal(result.Fields, json.Deterministic(true))
 				t.Fatalf("Expected %d fields, got %d: \n%s", len(s.expectFields), len(result.Fields), serialized)
 			}
 			for name, typ := range s.expectFields {

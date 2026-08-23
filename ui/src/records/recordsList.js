@@ -107,7 +107,10 @@ window.app.components.recordsList = function(propsArg = {}) {
                 relExpands.push(field.name);
             }
 
-            let requestFields = fieldsWithExcerpt(props.collection.id, relationFields);
+            // disable for now since loading the entire json often tends
+            // to be faster with encoding/json/v2 because it can be directly streamed
+            // const requestFields = fieldsWithExcerpt(props.collection.id, relationFields);
+            const requestFields = undefined;
 
             // allow sorting by the top level relation presentable fields
             let normalizedSort = props.sort || undefined;
@@ -119,11 +122,23 @@ window.app.components.recordsList = function(propsArg = {}) {
                 // default fallback to -@rowid when available
                 normalizedSort = props.collection.type != "view" ? "-@rowid" : undefined;
             } else if (sortField?.type == "relation") {
-                normalizedSort = app.store.collections
-                    ?.find((c) => c.id == sortField.collectionId)
-                    ?.fields?.filter((f) => f.presentable)
+                const sortCollection = app.store.collections?.find((c) => c.id == sortField.collectionId);
+
+                normalizedSort = sortCollection?.fields?.filter((f) => f.presentable)
+                    ?.sort((f1, f2) => f1.type == "file" ? 1 : 0) // deprioritize file fields because filenames are not shown in the table
                     ?.map((f) => (sortMatch[1] || "") + sortMatch[2] + "." + f.name)
                     ?.join(",");
+
+                // no explicit presentable -> try to utilize the first found implicit presentable field
+                // (https://github.com/pocketbase/pocketbase/discussions/7735)
+                if (normalizedSort == "") {
+                    for (let name of app.utils.fallbackPresentableProps) {
+                        if (sortCollection?.fields?.find((f) => f.name == name)) {
+                            normalizedSort = (sortMatch[1] || "") + sortMatch[2] + "." + name;
+                            break;
+                        }
+                    }
+                }
             }
 
             const page = reset ? 1 : data.lastPage + 1;
@@ -231,11 +246,13 @@ window.app.components.recordsList = function(propsArg = {}) {
             // - the collection update is added in case the collection fields have changed
             // - the record keys are added in case of a record field rename
             //   (the collection update and the refreshed records load doesn't happen at the same time)
+            // - the non-reactive list reset prop is to force a rerender on Refresh btn click
+            //   (e.g. in case a lazy expanded relation has changed and its presentable needs to be updated)
             return record.id + record[data.firstAutoUpdatedField.name] + props.collection?.updated
-                + Object.keys(record);
+                + Object.keys(record) + props.__raw?.reset;
         }
 
-        return JSON.stringify(record) + props.collection?.updated;
+        return JSON.stringify(record) + props.collection?.updated + props.__raw?.reset;
     }
 
     function isFieldColumnHidden(field) {
@@ -534,7 +551,7 @@ window.app.components.recordsList = function(propsArg = {}) {
                         );
                     }
 
-                    return data.records.map((record, i) => {
+                    return data.records.map((record) => {
                         return t.tr(
                             {
                                 rid: recordRid(record),
@@ -580,7 +597,21 @@ window.app.components.recordsList = function(propsArg = {}) {
                                         id: () => uniqueId + record.id,
                                         checked: () => !!data.bulkSelected[record.id],
                                         onchange: (e) => {
-                                            const bulkSelected = JSON.parse(JSON.stringify(data.bulkSelected));
+                                            let bulkSelected = Object.assign({}, data.bulkSelected);
+
+                                            // range select
+                                            if (e.target.__shiftKey) {
+                                                e.target.__shiftKey = false;
+
+                                                app.utils.bulkSelectRange(
+                                                    data.records,
+                                                    bulkSelected,
+                                                    record,
+                                                    e.target.checked,
+                                                );
+                                            }
+
+                                            // toggle current record
                                             if (e.target.checked) {
                                                 bulkSelected[record.id] = record;
                                             } else {
@@ -591,7 +622,18 @@ window.app.components.recordsList = function(propsArg = {}) {
                                             data.bulkSelected = bulkSelected;
                                         },
                                     }),
-                                    t.label({ htmlFor: uniqueId + record.id }),
+                                    t.label({
+                                        htmlFor: uniqueId + record.id,
+                                        // workaround https://github.com/pocketbase/pocketbase/issues/7771
+                                        onclick: (e) => {
+                                            e.preventDefault();
+                                            const input = document.getElementById(e.target.htmlFor);
+                                            if (input) {
+                                                input.__shiftKey = e.shiftKey;
+                                                input.click();
+                                            }
+                                        },
+                                    }),
                                 ),
                             ),
                             () => {

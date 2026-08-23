@@ -2,7 +2,7 @@ package core
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"os"
@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/go-ozzo/ozzo-validation/v4/is"
+	validation "github.com/pocketbase/ozzo-validation/v4"
+	"github.com/pocketbase/ozzo-validation/v4/is"
 	"github.com/pocketbase/pocketbase/core/validators"
 	"github.com/pocketbase/pocketbase/tools/cron"
 	"github.com/pocketbase/pocketbase/tools/hook"
@@ -237,7 +237,7 @@ func (s *Settings) String() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	raw, _ := json.Marshal(s)
+	raw, _ := s.MarshalJSON()
 	return string(raw)
 }
 
@@ -257,13 +257,7 @@ func (s *Settings) DBExport(app App) (map[string]any, error) {
 	}
 	result["updated"] = now
 
-	// @todo remove with encoding/json/2
-	// serialize as empty array
-	if s.settings.SuperuserIPs == nil {
-		s.settings.SuperuserIPs = []string{}
-	}
-
-	encoded, err := json.Marshal(s.settings)
+	encoded, err := json.Marshal(s.settings, json.Deterministic(true))
 	if err != nil {
 		return nil, err
 	}
@@ -354,13 +348,7 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 		}
 	}
 
-	// @todo remove with encoding/json/2
-	// serialize as empty array
-	if copy.SuperuserIPs == nil {
-		copy.SuperuserIPs = []string{}
-	}
-
-	return json.Marshal(copy)
+	return json.Marshal(copy, json.Deterministic(true))
 }
 
 // -------------------------------------------------------------------
@@ -558,6 +546,12 @@ func (c MetaConfig) Validate() error {
 // -------------------------------------------------------------------
 
 type LogsConfig struct {
+	// MaxDataSize specifies the maximum allowed serialized log data
+	// size before it gets truncated (see [Log.DBExport]).
+	//
+	// If zero, fallbacks to ~16kb by default.
+	MaxDataSize int64 `form:"maxDataSize" json:"maxDataSize"`
+
 	MaxDays   int  `form:"maxDays" json:"maxDays"`
 	MinLevel  int  `form:"minLevel" json:"minLevel"`
 	LogIP     bool `form:"logIP" json:"logIP"`
@@ -567,7 +561,9 @@ type LogsConfig struct {
 // Validate makes LogsConfig validatable by implementing [validation.Validatable] interface.
 func (c LogsConfig) Validate() error {
 	return validation.ValidateStruct(&c,
-		validation.Field(&c.MaxDays, validation.Min(0)),
+		validation.Field(&c.MaxDataSize, validation.Min(0), validation.Max(maxSafeJSONInt)),
+		validation.Field(&c.MaxDays, validation.Min(0), validation.Max(maxSafeJSONInt)),
+		validation.Field(&c.MinLevel, validation.Max(maxSafeJSONInt)),
 	)
 }
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -17,8 +17,8 @@ import (
 	"syscall"
 	"time"
 
-	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
+	validation "github.com/pocketbase/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/auth"
 	"github.com/pocketbase/pocketbase/tools/dbutils"
@@ -203,7 +203,6 @@ func (form *recordOAuth2LoginForm) validate() error {
 	return validation.ValidateStruct(form,
 		validation.Field(&form.Provider, validation.Required, validation.Length(0, 100), validation.By(form.checkProviderName)),
 		validation.Field(&form.Code, validation.Required),
-		validation.Field(&form.RedirectURL, validation.Required),
 	)
 }
 
